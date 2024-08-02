@@ -99,7 +99,7 @@ namespace DatabaseSchemaReader.ProviderSchemaReaders.Builders
             return table;
         }
 
-        public IList<DatabaseTable> Execute(CancellationToken ct)
+        public IList<DatabaseTable> Execute(CancellationToken ct, DatabaseTableComponentType components)
         {
             if (ct.IsCancellationRequested) return EmptyList();
 
@@ -107,21 +107,23 @@ namespace DatabaseSchemaReader.ProviderSchemaReaders.Builders
 
             if (ct.IsCancellationRequested) return tables;
 
-            var columns = _readerAdapter.Columns(null);
-            var identityColumns = _readerAdapter.IdentityColumns(null);
-            var checkConstraints = _readerAdapter.CheckConstraints(null);
-            var pks = _readerAdapter.PrimaryKeys(null);
-            var uks = _readerAdapter.UniqueKeys(null);
-            var fks = _readerAdapter.ForeignKeys(null);
-            
-            var dfs = _readerAdapter.DefaultConstraints(null);
-            var triggers = _readerAdapter.Triggers(null);
-            var tableDescs = _readerAdapter.TableDescriptions(null);
-            var colDescs = _readerAdapter.ColumnDescriptions(null);
-            var computed = _readerAdapter.ComputedColumns(null);
-            var indexes = MergeIndexColumns(_readerAdapter.Indexes(null), _readerAdapter.IndexColumns(null));
+            var columns = components.IsSet(DatabaseTableComponentType.Columns) ? _readerAdapter.Columns(null) : new List<DatabaseColumn>();
+            var identityColumns = components.IsSet(DatabaseTableComponentType.ColumnsIdentity) ? _readerAdapter.IdentityColumns(null) : new List<DatabaseColumn>();
+            var checkConstraints = components.IsSet(DatabaseTableComponentType.ConstraintsCheck) ? _readerAdapter.CheckConstraints(null) : new List<DatabaseConstraint>();
+            var pks = components.IsSet(DatabaseTableComponentType.ConstraintsPrimaryKey) ? _readerAdapter.PrimaryKeys(null) : new List<DatabaseConstraint>();
+            var uks = components.IsSet(DatabaseTableComponentType.ConstraintsUniqueKey) ? _readerAdapter.UniqueKeys(null) : new List<DatabaseConstraint>();
+            var fks = components.IsSet(DatabaseTableComponentType.ConstraintsForeignKey) ? _readerAdapter.ForeignKeys(null) : new List<DatabaseConstraint>();
+
+            var dfs = components.IsSet(DatabaseTableComponentType.ConstraintsDefault) ? _readerAdapter.DefaultConstraints(null) : new List<DatabaseConstraint>();
+            var triggers = components.IsSet(DatabaseTableComponentType.Triggers) ? _readerAdapter.Triggers(null) : new List<DatabaseTrigger>();
+            var tableDescs = components.IsSet(DatabaseTableComponentType.DescriptionsTable) ? _readerAdapter.TableDescriptions(null) : new List<DatabaseTable>();
+            var colDescs = components.IsSet(DatabaseTableComponentType.DescriptionsColumn) ? _readerAdapter.ColumnDescriptions(null) : new List<DatabaseTable>();
+            var computed = components.IsSet(DatabaseTableComponentType.ColumnsComputed) ? _readerAdapter.ComputedColumns(null) : new List<DatabaseColumn>();
+            var indexes = components.IsSet(DatabaseTableComponentType.Indexes) ? MergeIndexColumns(_readerAdapter.Indexes(null), _readerAdapter.IndexColumns(null)) : ((IList<DatabaseIndex>)new List<DatabaseIndex>());
+
             var noIndexes = (indexes.Count == 0); //we may not be able to get any indexes without a tableName
-            FillOutForeignKey(fks, indexes);
+            if (components.IsSet(DatabaseTableComponentType.Indexes) && components.IsSet(DatabaseTableComponentType.ConstraintsForeignKey)) 
+                FillOutForeignKey(fks, indexes);
             
             var tableFilter = _readerAdapter.Parameters.Exclusions.TableFilter;
             if (tableFilter != null)
@@ -139,16 +141,19 @@ namespace DatabaseSchemaReader.ProviderSchemaReaders.Builders
                 if (ct.IsCancellationRequested) return tables;
                 RaiseProgress(ProgressType.Processing, SchemaObjectType.Tables,
                     tableName, i, tablesCount);
-                IEnumerable<DatabaseColumn> tableCols;
-                if (columns.Count == 0)
+                IEnumerable<DatabaseColumn> tableCols = Enumerable.Empty<DatabaseColumn>();
+                if (components.IsSet(DatabaseTableComponentType.Columns))
                 {
-                    tableCols = _readerAdapter.Columns(tableName);
-                }
-                else
-                {
-                    tableCols =
-                       columns.Where(x => string.Equals(x.TableName, tableName, StringComparison.OrdinalIgnoreCase)
-                                          && string.Equals(x.SchemaOwner, schemaName, StringComparison.OrdinalIgnoreCase));
+                    if (columns.Count == 0)
+                    {
+                        tableCols = _readerAdapter.Columns(tableName);
+                    }
+                    else
+                    {
+                        tableCols =
+                           columns.Where(x => string.Equals(x.TableName, tableName, StringComparison.OrdinalIgnoreCase)
+                                              && string.Equals(x.SchemaOwner, schemaName, StringComparison.OrdinalIgnoreCase));
+                    }
                 }
                 table.Columns.AddRange(tableCols);
                 UpdateIdentities(table.Columns, identityColumns);
@@ -158,7 +163,7 @@ namespace DatabaseSchemaReader.ProviderSchemaReaders.Builders
                 UpdateConstraints(table, uks, ConstraintType.UniqueKey);
                 UpdateConstraints(table, fks, ConstraintType.ForeignKey);
                 UpdateConstraints(table, dfs, ConstraintType.Default);
-                if (noIndexes)
+                if (components.IsSet(DatabaseTableComponentType.Indexes) && noIndexes)
                 {
                     indexes.Clear();
                     indexes = MergeIndexColumns(_readerAdapter.Indexes(tableName), _readerAdapter.IndexColumns(tableName));

@@ -39,7 +39,7 @@ namespace DatabaseSchemaReader
         /// <summary>
         /// Gets all tables (plus constraints, indexes and triggers).
         /// </summary>
-        IList<DatabaseTable> AllTables();
+        IList<DatabaseTable> AllTables(DatabaseTableComponentType components = DatabaseTableComponentType.All);
 
         /// <summary>
         /// Gets all views.
