@@ -219,12 +219,16 @@ namespace DatabaseSchemaReader
             return _db;
         }
 
-        private void AllSequences()
+        /// <summary>
+        /// Gets the sequences
+        /// </summary>
+        public IList<DatabaseSequence> AllSequences()
         {
             RaiseReadingProgress(SchemaObjectType.Sequences);
             var sequences = _readerAdapter.Sequences(null);
             DatabaseSchema.Sequences.Clear();
             DatabaseSchema.Sequences.AddRange(sequences);
+            return sequences;
         }
 
         /// <summary>
