@@ -3,7 +3,7 @@
 namespace DatabaseSchemaReader.DataSchema
 {
     /// <summary>
-    /// Table sub compnents (columns, views, triggers, etc..)
+    /// Table sub compnents (columns, constraints, triggers, etc..)
     /// </summary>
     [Flags]
     public enum DatabaseTableComponentType
