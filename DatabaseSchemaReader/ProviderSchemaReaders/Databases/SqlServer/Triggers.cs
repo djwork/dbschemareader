@@ -51,6 +51,7 @@ WHERE (SCHEMA_NAME(parent.schema_id) = @Owner or (@Owner is null))
                 SchemaOwner = record.GetString("TABLE_SCHEMA"),
                 TableName = record.GetString("TABLE_NAME"),
                 TriggerBody = record.GetString("TRIGGER_BODY"),
+                Enabled = !record.GetBoolean("IS_DISABLED")
             };
             var triggerEvents = new List<string>();
             if (record.GetBoolean("IS_UPDATE"))
