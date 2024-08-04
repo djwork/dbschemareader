@@ -348,15 +348,15 @@ namespace DatabaseSchemaReader
         /// <summary>
         /// Gets all views.
         /// </summary>
-        public IList<DatabaseView> AllViews()
+        public IList<DatabaseView> AllViews(DatabaseViewComponentType components = DatabaseViewComponentType.All)
         {
-            return AllViews(CancellationToken.None);
+            return AllViews(CancellationToken.None, components);
         }
 
         /// <summary>
         /// Gets all views.
         /// </summary>
-        public IList<DatabaseView> AllViews(CancellationToken ct)
+        public IList<DatabaseView> AllViews(CancellationToken ct, DatabaseViewComponentType components = DatabaseViewComponentType.All)
         {
             if (ct.IsCancellationRequested) return DatabaseSchema.Views;
 
@@ -366,7 +366,7 @@ namespace DatabaseSchemaReader
                 var builder = new ViewBuilder(_readerAdapter, Exclusions);
                 var handler = ReaderProgress;
                 if (handler != null) builder.ReaderProgress += RaiseReadingProgress;
-                views = builder.Execute(ct);
+                views = builder.Execute(ct, components);
             }
 
             DatabaseSchema.Views.Clear();

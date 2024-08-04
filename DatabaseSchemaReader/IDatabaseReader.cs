@@ -44,7 +44,7 @@ namespace DatabaseSchemaReader
         /// <summary>
         /// Gets all views.
         /// </summary>
-        IList<DatabaseView> AllViews();
+        IList<DatabaseView> AllViews(DatabaseViewComponentType components = DatabaseViewComponentType.All);
 
         /// <summary>
         /// Gets the table. If <see cref="DatabaseReader.Owner"/> is specified, it is used.

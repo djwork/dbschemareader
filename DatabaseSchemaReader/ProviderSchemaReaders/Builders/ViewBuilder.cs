@@ -1,6 +1,7 @@
 ﻿using DatabaseSchemaReader.DataSchema;
 using DatabaseSchemaReader.Filters;
 using DatabaseSchemaReader.ProviderSchemaReaders.Adapters;
+using DatabaseSchemaReader.ProviderSchemaReaders.ResultModels;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -35,7 +36,7 @@ namespace DatabaseSchemaReader.ProviderSchemaReaders.Builders
     name, index, count);
         }
 
-        public IList<DatabaseView> Execute(CancellationToken ct)
+        public IList<DatabaseView> Execute(CancellationToken ct, DatabaseViewComponentType components)
         {
             if (ct.IsCancellationRequested) return new List<DatabaseView>();
             RaiseReadingProgress(SchemaObjectType.Views);
@@ -50,8 +51,8 @@ namespace DatabaseSchemaReader.ProviderSchemaReaders.Builders
             }
 
             if (ct.IsCancellationRequested) return views;
-            var sources = _readerAdapter.ViewSources(null);
-            if (sources.Count > 0)
+            var sources = components.IsSet(DatabaseViewComponentType.Source) ? _readerAdapter.ViewSources(null) : new List<ProcedureSource>();
+            if (components.IsSet(DatabaseViewComponentType.Source) && sources.Count > 0)
             {
                 foreach (var view in views)
                 {
@@ -63,36 +64,45 @@ namespace DatabaseSchemaReader.ProviderSchemaReaders.Builders
             }
 
             if (ct.IsCancellationRequested) return views;
-            var indexes = _readerAdapter.ViewIndexes(null);
+            var indexes = components.IsSet(DatabaseViewComponentType.Indexes) ? _readerAdapter.ViewIndexes(null) : new List<DatabaseIndex>();
 
             //get full datatables for all tables, to minimize database calls
             if (ct.IsCancellationRequested) return views;
             RaiseReadingProgress(SchemaObjectType.ViewColumns);
 
-            var viewColumns = _readerAdapter.ViewColumns(null);
+            var viewColumns = components.IsSet(DatabaseViewComponentType.Columns) ? _readerAdapter.ViewColumns(null) : new List<DatabaseColumn>();
             var count = views.Count;
             for (var index = 0; index < count; index++)
             {
                 if (ct.IsCancellationRequested) return views;
                 DatabaseView v = views[index];
                 ReaderEventArgs.RaiseEvent(ReaderProgress, this, ProgressType.Processing, SchemaObjectType.ViewColumns, v.Name, index, count);
-                IEnumerable<DatabaseColumn> cols;
-                if (viewColumns.Count == 0)
+                if (components.IsSet(DatabaseViewComponentType.Columns))
                 {
-                    cols = _readerAdapter.ViewColumns(v.Name);
+                    IEnumerable<DatabaseColumn> cols;
+                    if (viewColumns.Count == 0)
+                    {
+                        cols = _readerAdapter.ViewColumns(v.Name);
+                    }
+                    else
+                    {
+                        cols = viewColumns.Where(x => x.TableName == v.Name && x.SchemaOwner == v.SchemaOwner);
+                    }
+                    v.Columns.AddRange(cols);
                 }
-                else
+                if (components.IsSet(DatabaseViewComponentType.Indexes))
                 {
-                    cols = viewColumns.Where(x => x.TableName == v.Name && x.SchemaOwner == v.SchemaOwner);
+                    v.Indexes = indexes.Where(x => x.TableName == v.Name && x.SchemaOwner == v.SchemaOwner).ToList();
                 }
-                v.Columns.AddRange(cols);
-                v.Indexes = indexes.Where(x => x.TableName == v.Name && x.SchemaOwner == v.SchemaOwner).ToList();
             }
 
-            var triggers = _readerAdapter.Triggers(null);
-            foreach (var view in views)
+            if (components.IsSet(DatabaseViewComponentType.Triggers))
             {
-                UpdateTriggers(view, triggers);
+                var triggers = _readerAdapter.Triggers(null);
+                foreach (var view in views)
+                {
+                    UpdateTriggers(view, triggers);
+                }
             }
 
             return views;
