@@ -14,13 +14,14 @@ namespace DatabaseSchemaReader.ProviderSchemaReaders.Databases.Oracle
             _tableName = tableName;
             Sql = @"SELECT OWNER,
   TRIGGER_NAME,
+  TABLE_OWNER,
   TABLE_NAME,
   TRIGGER_BODY,
   TRIGGERING_EVENT,
-  TRIGGER_TYPE
+  TRIGGER_TYPE,
+  CASE STATUS WHEN 'DISABLED' THEN 'true' ELSE 'false' END as IS_DISABLED
 FROM ALL_TRIGGERS
-WHERE STATUS = 'ENABLED' AND 
-(TABLE_NAME = :tableName OR :tableName IS NULL) AND 
+WHERE (TABLE_NAME = :tableName OR :tableName IS NULL) AND 
 (OWNER = :schemaOwner OR :schemaOwner IS NULL) AND 
 TRIGGER_NAME NOT IN ( SELECT object_name FROM USER_RECYCLEBIN ) 
 ";
@@ -40,10 +41,12 @@ TRIGGER_NAME NOT IN ( SELECT object_name FROM USER_RECYCLEBIN )
             {
                 Name = record.GetString("TRIGGER_NAME"),
                 SchemaOwner = record.GetString("OWNER"),
+                TableSchemaOwner = record.GetString("TABLE_OWNER"),
                 TableName = record.GetString("TABLE_NAME"),
                 TriggerBody = record.GetString("TRIGGER_BODY"),
                 TriggerType = record.GetString("TRIGGER_TYPE"),
                 TriggerEvent = record.GetString("TRIGGERING_EVENT"),
+                Enabled = record.GetBoolean("IS_DISABLED")
             };
             Result.Add(trigger);
         }
